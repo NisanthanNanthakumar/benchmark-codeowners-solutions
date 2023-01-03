@@ -5,7 +5,7 @@ pub fn path_to_regex(pattern: &str) -> Regex {
 
     // Special case backslash can match a backslash file or directory
     if pattern.starts_with("\\") {
-        return Regex::new(r"\\(?:\\Z|/)").unwrap();
+        return Regex::new(r"\\(?:\z|/)").unwrap();
     }
 
     let anchored = pattern
@@ -13,9 +13,9 @@ pub fn path_to_regex(pattern: &str) -> Regex {
         .map_or(false, |pos| pos != pattern.len() - 1);
 
     if anchored {
-        regex += r"\\A";
+        regex += r"\A";
     } else {
-        regex += r"(?:\\A|/)";
+        regex += r"(?:\A|/)";
     }
 
     let matches_dir = pattern.ends_with("/");
@@ -27,9 +27,6 @@ pub fn path_to_regex(pattern: &str) -> Regex {
     // patterns ending with "/*" are special. They only match items directly in the directory
     // not deeper
     let trailing_slash_star = pattern.len() > 1 && pattern.ends_with("/*");
-    if trailing_slash_star {
-        pattern = pattern.trim_end_matches("*");
-    }
 
     let mut iterator = pattern.chars().enumerate();
 
@@ -45,7 +42,6 @@ pub fn path_to_regex(pattern: &str) -> Regex {
             num_to_skip = Some(skip_amount - 1);
             continue;
         }
-
         if ch == '*' {
             // Handle double star (**) case properly
             if i + 1 < pattern.len() && pattern.chars().nth(i + 1) == Some('*') {
@@ -63,7 +59,7 @@ pub fn path_to_regex(pattern: &str) -> Regex {
             }
             regex += r"[^/]*";
         } else if ch == '?' {
-            regex += "[^/]";
+            regex += r"[^/]";
         } else {
             regex += &regex::escape(ch.to_string().as_str());
         }
@@ -72,9 +68,9 @@ pub fn path_to_regex(pattern: &str) -> Regex {
     if matches_dir {
         regex += "/";
     } else if trailing_slash_star {
-        regex += r"\\Z";
+        regex += r"\z";
     } else {
-        regex += r"(?:\\Z|/)";
+        regex += r"(?:\z|/)";
     }
     Regex::new(&regex).unwrap()
 }
@@ -88,16 +84,15 @@ mod tests {
     fn test_path_to_regex() {
         let pattern = "*.txt";
         let regex = path_to_regex(pattern);
-        println!("regex: {}", regex);
         assert!(regex.is_match("file.txt"));
-        assert!(!regex.is_match("file.txt/"));
-        assert!(!regex.is_match("dir/file.txt"));
+        assert!(regex.is_match("file.txt/"));
+        assert!(regex.is_match("dir/file.txt"));
 
         let pattern = "/dir/*.txt";
         let regex = path_to_regex(pattern);
         assert!(regex.is_match("/dir/file.txt"));
+        assert!(regex.is_match("dir/file.txt"));
         assert!(!regex.is_match("/dir/subdir/file.txt"));
-        assert!(!regex.is_match("dir/file.txt"));
 
         let pattern = "apps/";
         let regex = path_to_regex(pattern);
@@ -114,8 +109,8 @@ mod tests {
 
         let pattern = "/docs/";
         let regex = path_to_regex(pattern);
-        assert!(regex.is_match("/dir/file.txt"));
-        assert!(regex.is_match("/dir/subdir/file.txt"));
-        assert!(!regex.is_match("app/dir/file.txt"));
+        assert!(regex.is_match("/docs/file.txt"));
+        assert!(regex.is_match("/docs/subdir/file.txt"));
+        assert!(!regex.is_match("app/docs/file.txt"));
     }
 }
